@@ -1,4 +1,6 @@
-﻿namespace MyAPITesting.Data
+﻿using System.Data;
+
+namespace MyAPITesting.Data
 {
     public class Employee
     {       
