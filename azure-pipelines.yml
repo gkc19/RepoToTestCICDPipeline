@@ -1,40 +1,111 @@
-name: Deploy .NET Web API to Azure App Service Paas
+trigger:
+  branches:
+    include:
+      - main
 
-on:
-  push:
-    branches:
-      - master
+pr: none
 
-env:
-  AZURE_WEBAPP_NAME: MyFirstWebApp
-  DOTNET_VERSION: '10.0.x'
-  PROJECT_PATH: './MyAPITesting/MyAPITesting.csproj'
+variables:
+  buildConfiguration: 'Release'
+  dotnetVersion: '10.0.x'
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+  # Path from repository root to the Web API project
+  projectPath: 'MyAPITesting/MyAPITesting.csproj'
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  # Azure DevOps service connection name
+  azureServiceConnection: 'YOUR-AZURE-SERVICE-CONNECTION'
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+  # Exact Azure App Service name, not the URL
+  appServiceName: 'YOUR-APP-SERVICE-NAME'
 
-      - name: Restore dependencies
-        run: dotnet restore ${{ env.PROJECT_PATH }}
+stages:
 
-      - name: Build
-        run: dotnet build ${{ env.PROJECT_PATH }} --configuration Release --no-restore
+# =========================================================
+# CI Stage: Restore, build and publish the .NET Web API
+# =========================================================
+- stage: Build
+  displayName: 'Build Web API'
 
-      - name: Publish
-        run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --output ./publish
+  jobs:
+    - job: BuildJob
+      displayName: 'Restore, Build and Publish'
 
-      - name: Deploy to Azure App Service
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ./publish
+      pool:
+        vmImage: 'windows-latest'
+
+      steps:
+        - checkout: self
+          displayName: 'Checkout GitHub repository'
+
+        - task: UseDotNet@2
+          displayName: 'Install .NET SDK'
+          inputs:
+            packageType: 'sdk'
+            version: '$(dotnetVersion)'
+
+        - task: DotNetCoreCLI@2
+          displayName: 'Restore NuGet packages'
+          inputs:
+            command: 'restore'
+            projects: '$(projectPath)'
+
+        - task: DotNetCoreCLI@2
+          displayName: 'Build Web API'
+          inputs:
+            command: 'build'
+            projects: '$(projectPath)'
+            arguments: >
+              --configuration $(buildConfiguration)
+              --no-restore
+
+        - task: DotNetCoreCLI@2
+          displayName: 'Publish Web API'
+          inputs:
+            command: 'publish'
+            publishWebProjects: false
+            projects: '$(projectPath)'
+            arguments: >
+              --configuration $(buildConfiguration)
+              --output $(Build.ArtifactStagingDirectory)/publish
+              --no-build
+            zipAfterPublish: true
+
+        - task: PublishPipelineArtifact@1
+          displayName: 'Publish deployment artifact'
+          inputs:
+            targetPath: '$(Build.ArtifactStagingDirectory)/publish'
+            artifact: 'webapi'
+            publishLocation: 'pipeline'
+
+
+# =========================================================
+# CD Stage: Deploy the published ZIP to Azure App Service
+# =========================================================
+- stage: Deploy
+  displayName: 'Deploy to Azure App Service'
+  dependsOn: Build
+  condition: succeeded()
+
+  jobs:
+    - deployment: DeployWebApi
+      displayName: 'Deploy Web API'
+
+      pool:
+        vmImage: 'windows-latest'
+
+      environment: 'Development'
+
+      strategy:
+        runOnce:
+          deploy:
+            steps:
+              - download: current
+                artifact: 'webapi'
+
+              - task: AzureWebApp@1
+                displayName: 'Deploy Web API to App Service'
+                inputs:
+                  azureSubscription: '$(azureServiceConnection)'
+                  appType: 'webApp'
+                  appName: '$(appServiceName)'
+                  package: '$(Pipeline.Workspace)/webapi/**/*.zip'
