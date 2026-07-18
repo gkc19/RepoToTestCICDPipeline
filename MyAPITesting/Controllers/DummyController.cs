@@ -13,7 +13,7 @@ namespace MyAPITesting.Controllers
            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
        ];
 
-        [HttpGet(Name = "GetValues")]
+        [HttpGet(Name = "GetValuesForTesting")]
         public IEnumerable<WeatherForecast> Get()
         {
             return Enumerable.Range(1, 5).Select(index => new WeatherForecast
