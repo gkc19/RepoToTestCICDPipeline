@@ -13,10 +13,10 @@ variables:
   projectPath: 'MyAPITesting/MyAPITesting.csproj'
 
   # Azure DevOps service connection name
-  azureServiceConnection: 'YOUR-AZURE-SERVICE-CONNECTION'
+  azureServiceConnection: 'Azure-AppService-Connection'
 
   # Exact Azure App Service name, not the URL
-  appServiceName: 'YOUR-APP-SERVICE-NAME'
+  appServiceName: 'MyFirstWebApp'
 
 stages:
 
