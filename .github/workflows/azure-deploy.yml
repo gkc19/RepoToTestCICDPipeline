@@ -1,9 +1,7 @@
 name: Deploy .NET Web API to Azure App Service Paas
 
 on:
-  push:
-    branches:
-      - master
+ workflow_dispatch:
 
 env:
   AZURE_WEBAPP_NAME: MyFirstWebApp
